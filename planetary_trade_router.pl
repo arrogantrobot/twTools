@@ -1,5 +1,15 @@
 #!/usr/bin/perl
 
+#   This is a utility for creating routes along which to move planets in 
+#   the BBS door game TradeWars 2002, so that one might sell organics and 
+#   make tonnes of money. The required params to run are:
+#   --warps  <path to my CIM sector report>
+#   --ports <path to my CIM port report>
+#   --start <sector number> 
+#
+#   see the GetOptions call below for more params
+
+
 use strict;
 use warnings;
 use IO::File;
@@ -22,7 +32,7 @@ my $max_ports='';
 
 GetOptions( 'min_org' => \$min_org,
         'min_org_percentage' => \$min_org_percentage,
-        'start' => \$start,
+        'start=i' => \$start,
         'stop' => \$stop,
         'max-fuel=s' => \$max_fuel,
         'max-holds=s' => \$max_holds,
