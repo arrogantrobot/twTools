@@ -57,10 +57,11 @@ for (1..100){
     my $next_port  = find_nearest_o($current_sector);
     my $distance  = find_distance($current_sector,$next_port);
     $total_distance+= $distance;
-    $total_organics+= $sectors{$next_port}{port}{o}*(-1);
+    my $org_sold = int(($sectors{$next_port}{port}{o}*(-1))/250)*250;
+    $total_organics+= $org_sold; 
     print "Move \t"; print color 'red'; print $distance; print color 'reset'; print "\t warps to sector \t";
     print color 'cyan'; print $next_port; print color 'reset'; print "\t which is selling ";
-    print color 'green'; print $sectors{$next_port}{port}{o}; print color 'reset'; print " organics.\n";
+    print color 'green'; print $org_sold; print color 'reset'; print " organics.\n";
     delete $sectors{$next_port}{port};
     $current_sector = $next_port;
     $final_leap = find_distance($current_sector,$start);
