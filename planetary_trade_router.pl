@@ -107,6 +107,8 @@ sub find_nearest_o {
     my $found = 0;
     my @warps = @{ $sectors{$sector}{warps} };
     my @next_warps;
+    my $highest_org=0;
+    my $port_location;
     while(@warps){
         while(@warps){
             $sector = shift @warps;
@@ -114,12 +116,16 @@ sub find_nearest_o {
             if(exists($sectors{$sector}{port}) && 
                     ($sectors{$sector}{port}{o} <= $min_org) &&
                     ($sectors{$sector}{port}{op} >= $min_org_percentage)){
-                return $sector;	
+                if(($sectors{$sector}{port}{o}*(-1)) > $highest_org){
+                    $highest_org = ($sectors{$sector}{port}{o})*(-1);
+                    $port_location = $sector;
+                }
             } else {
                 my @thing = @{ $sectors{$sector}{warps} };
                 push @next_warps, grep { not exists($explored{$_}) }  @thing;
             }
         }
+        return $port_location if defined($port_location);
         push @warps, @next_warps;
     }
     die "Found no organics purchasing ports adjacent to ".$orig_sector;
