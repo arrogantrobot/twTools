@@ -21,6 +21,8 @@ my $min_org = -1000;
 my $min_org_percentage = 0.8;
 
 my %sectors;
+my @routes;
+my %used_ports;
 my $start = 1835;
 my $stop = -1;
 my $max_fuel='';
@@ -53,7 +55,7 @@ my $total_distance;
 my $total_organics;
 my $final_leap;
 
-for (1..100){
+for (1..1000){
     my $next_port  = find_nearest_o($current_sector);
     my $distance  = find_distance($current_sector,$next_port);
     $total_distance+= $distance;
@@ -97,6 +99,7 @@ print "\nAnd the final leap, the leap home: "; print color 'red'; print $final_l
 print "\nA total distance of "; print color 'red'; print $total_distance; print color 'reset'; print " using "; print color 'red';
 print ($total_distance*400); print color 'reset'; print " holds of fuel ore.\n";
 print "Moving "; print color 'green'; print $total_organics; print color 'reset'; print " holds of organics.\n\n";
+print "This route has an efficiency rating of "; print color 'blue'; printf("%.3f",$total_organics/($total_distance*400)); print color 'reset'; print "\n\n";
 
 
 sub find_nearest_o {
