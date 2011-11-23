@@ -1,6 +1,7 @@
 import com.swath.*;
 import com.swath.cmd.*;
 import java.util.Queue;
+import java.lang.Math;
 
 /**
  * "Planetary Trade Route" swath script.
@@ -17,6 +18,8 @@ public class PlanetaryTradeRoute extends UserDefinedScript {
     private Parameter m_min_percentage;
     private Parameter m_dump_creds;
     private Parameter m_num_ports;
+    private Parameter m_fuel_up;
+    private Parameter m_fuel_only;
 
     private int port_count;
     private int max_ports;
@@ -26,7 +29,6 @@ public class PlanetaryTradeRoute extends UserDefinedScript {
     private int m_type2;
     private boolean m_buy;
     private int m_buy_amount;
-
 
     public String getName() {
         return "PlanetaryTradeRoute";
@@ -62,11 +64,19 @@ public class PlanetaryTradeRoute extends UserDefinedScript {
         m_dump_creds=new Parameter("Dump credits into citadel after each run");
         m_dump_creds.setBoolean(false);
 
+        m_fuel_up =new Parameter("Llena el tanque?");
+        m_fuel_up.setBoolean(false);
+
+        m_fuel_only =new Parameter("Stick to the interstates?");
+        m_fuel_only.setBoolean(false);
+
         registerParam(m_planet);
         registerParam(m_min_amount);
         registerParam(m_min_percentage);
         registerParam(m_dump_creds);
         registerParam(m_num_ports);
+        registerParam(m_fuel_up);
+        registerParam(m_fuel_only);
 
         port_count = 0;
         return true;
@@ -112,6 +122,9 @@ public class PlanetaryTradeRoute extends UserDefinedScript {
         next.setMinPercentage(Swath.ORGANICS, m_min_percentage.getInteger());
         next.setMinAmount(Swath.ORGANICS, m_min_amount.getInteger());
         next.setPortOption(Swath.ORGANICS, true);
+        if(m_fuel_only.getBoolean()){
+            next.setPortOption(Swath.FUEL_ORE, false);
+        }
         int[] ports = Tools.findPorts( next, true, 10 );
         int count=0;
         Sector answer = Swath.getSector(ports[0]);
@@ -149,9 +162,15 @@ public class PlanetaryTradeRoute extends UserDefinedScript {
         int amount_to_buy=0;
         int buy_amount = 0;
 
-        if(m_buy){
-            buy_amount = m_buy_amount;
+        if(m_fuel_up.getBoolean()){ // && (sector.portInfo()[0] == Sector.SELLING)){
+            Sector sector = Swath.getSector(Swath.main.currSector());
+            product_to_buy = 0;
+            buy_amount = Math.min(sell_amount, sector.portAmounts()[0])-1 ;
         }
+
+        /*if(m_buy){
+          buy_amount = m_buy_amount;
+          }*/
 
         Ship my_ship = Swath.ship;
 
@@ -166,20 +185,6 @@ public class PlanetaryTradeRoute extends UserDefinedScript {
                 product_to_sell = 2;
                 break;
         }
-        if (m_buy) {
-            switch (m_type2) {
-                case Swath.FUEL_ORE:
-                    product_to_buy = 0;
-                    break;
-                case Swath.ORGANICS:
-                    product_to_buy = 1;
-                    break;
-                case Swath.EQUIPMENT:
-                    product_to_buy = 2;
-                    break;
-            }
-        }
-
 
         to_buy = buy_amount - bought_amount;
         to_sell = sell_amount - sold_amount;
@@ -244,15 +249,15 @@ public class PlanetaryTradeRoute extends UserDefinedScript {
         }
 
         return true;
-    }
-
-
-    public boolean is_ok(){
-        if(++port_count> max_ports){
-            return false;
         }
-        return true;
+
+
+        public boolean is_ok(){
+            if(++port_count> max_ports){
+                return false;
+            }
+            return true;
+        }
+
+
     }
-
-
-}
