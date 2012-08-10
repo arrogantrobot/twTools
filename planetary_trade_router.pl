@@ -25,75 +25,53 @@ my @routes;
 my %used_ports;
 my $start = 1835;
 my $stop = -1;
-my $max_fuel='';
-my $max_holds='';
-my $warps_file='';
-my $ports_file='';
-my $max_ports='';
+my $max_fuel = '';
+my $max_holds = '';
+my $warps_file = '';
+my $ports_file = '';
+my $max_ports = '';
+my $greedy = 1;
+my $re = '';
 
 
-GetOptions( 'min_org' => \$min_org,
-        'min_org_percentage' => \$min_org_percentage,
-        'start=i' => \$start,
-        'stop' => \$stop,
-        'max-fuel=s' => \$max_fuel,
-        'max-holds=s' => \$max_holds,
-        'max-ports=s' => \$max_ports,
-        'warps=s' => \$warps_file,
-        'ports=s' => \$ports_file,
+GetOptions( 
+    'min_org' => \$min_org,
+    'min_org_percentage' => \$min_org_percentage,
+    'start=i' => \$start,
+    'stop' => \$stop,
+    'max-fuel=s' => \$max_fuel,
+    'max-holds=s' => \$max_holds,
+    'max-ports=s' => \$max_ports,
+    'warps=s' => \$warps_file,
+    'ports=s' => \$ports_file,
+    'greedy' => \$greedy,
+    're' => \$re,
 );
 
-if($stop == -1){
+if ($stop == -1){
     $stop = $start;
+}
+
+if ($re) {
+    $greedy = '';
 }
 
 my $current_sector = $start;
 
 init();
 
+
 my $total_distance;
 my $total_organics;
 my $final_leap;
-
-for (1..1000){
-    my $next_port  = find_nearest_o($current_sector);
-    my $distance  = find_distance($current_sector,$next_port);
-    $total_distance+= $distance;
-    my $org_sold = int(($sectors{$next_port}{port}{o}*(-1))/250)*250;
-    $total_organics+= $org_sold; 
-    print "Move \t"; print color 'red'; print $distance; print color 'reset'; print "\t warps to sector \t";
-    print color 'cyan'; print $next_port; print color 'reset'; print "\t which is selling ";
-    print color 'green'; print $org_sold; print color 'reset'; print " organics.\n";
-    delete $sectors{$next_port}{port};
-    $current_sector = $next_port;
-    $final_leap = find_distance($current_sector,$start);
-    if(defined($max_fuel)){
-        if((($final_leap+$total_distance)*400) >= $max_fuel){
-            print color 'red';
-            print "\nReached max fuel, returning home.\n";
-            print color 'reset';
-            last;
-        }
-    }
-    if($max_holds){
-        if($total_organics >= $max_holds){
-            print color 'red';
-            print "\nReached max holds, returning home.\n";
-            print color 'reset';
-            last;
-        }
-    }
-    if($max_ports){
-        if($_ >= $max_ports){
-            print color 'red';
-            print "\nReached max ports, returning home.\n";
-            print color 'reset';
-            last;
-        }
-    }
+$DB::single = 1;
+if ($greedy) {
+    greedy();
+} else {
+    re();
 }
 
-$total_distance+=$final_leap;
+$total_distance += $final_leap;
 
 print "\nAnd the final leap, the leap home: "; print color 'red'; print $final_leap; print color 'reset'; print " warps.\n";
 print "\nA total distance of "; print color 'red'; print $total_distance; print color 'reset'; print " using "; print color 'red';
@@ -101,6 +79,48 @@ print ($total_distance*400); print color 'reset'; print " holds of fuel ore.\n";
 print "Moving "; print color 'green'; print $total_organics; print color 'reset'; print " holds of organics.\n\n";
 print "This route has an efficiency rating of "; print color 'blue'; printf("%.3f",$total_organics/($total_distance*400)); print color 'reset'; print "\n\n";
 
+
+sub greedy {
+    for (1..1000) {
+        my $next_port  = $greedy ? find_nearest_o($current_sector) : find_nearest_o_re($current_sector);
+        my $distance  = find_distance($current_sector,$next_port);
+        $total_distance += $distance;
+        my $org_sold = int(($sectors{$next_port}{port}{o} * (-1)) / 250) * 250;
+        $total_organics += $org_sold; 
+
+        print "Move \t"; print color 'red'; print $distance; print color 'reset'; print "\t warps to sector \t";
+        print color 'cyan'; print $next_port; print color 'reset'; print "\t which is selling ";
+        print color 'green'; print $org_sold; print color 'reset'; print " organics.\n";
+
+        delete $sectors{$next_port}{port};
+        $current_sector = $next_port;
+        $final_leap = find_distance($current_sector, $start);
+        if (defined($max_fuel)) {
+            if ((($final_leap + $total_distance) * 400) >= $max_fuel) {
+                print color 'red';
+                print "\nReached max fuel, returning home.\n";
+                print color 'reset';
+                last;
+            }
+        }
+        if ($max_holds) {
+            if ($total_organics >= $max_holds) {
+                print color 'red';
+                print "\nReached max holds, returning home.\n";
+                print color 'reset';
+                last;
+            }
+        }
+        if ($max_ports) {
+            if ($_ >= $max_ports) {
+                print color 'red';
+                print "\nReached max ports, returning home.\n";
+                print color 'reset';
+                last;
+            }
+        }
+    }
+}
 
 sub find_nearest_o {
     my $sector = shift;
@@ -110,24 +130,31 @@ sub find_nearest_o {
     my $found = 0;
     my @warps = @{ $sectors{$sector}{warps} };
     my @next_warps;
-    my $highest_org=0;
+    my $highest_org = 0;
     my $port_location;
-    while(@warps){
-        while(@warps){
+    my $distance = 1;
+    while (@warps) {
+        while (@warps) {
             $sector = shift @warps;
             $explored{$sector} = 1;
-            if(exists($sectors{$sector}{port}) && 
-                    ($sectors{$sector}{port}{o} <= $min_org) &&
-                    ($sectors{$sector}{port}{op} >= $min_org_percentage)){
-                if(($sectors{$sector}{port}{o}*(-1)) > $highest_org){
-                    $highest_org = ($sectors{$sector}{port}{o})*(-1);
-                    $port_location = $sector;
-                }
+            if (exists($sectors{$sector}{port}) && ($sectors{$sector}{port}{o} <= $min_org) && ($sectors{$sector}{port}{op} >= $min_org_percentage)) {
+                if ($greedy) {
+                    if (($sectors{$sector}{port}{o} * (-1)) > $highest_org) {
+                        $highest_org = ($sectors{$sector}{port}{o}) * (-1);
+                        $port_location = $sector;
+                    }
+                } else {
+                    if (($sectors{$sector}{port}{o} * (-1)) > $highest_org) {
+                        $highest_org = ($sectors{$sector}{port}{o}) * (-1);
+                        $port_location = $sector;
+                    }
+                }    
             } else {
                 my @thing = @{ $sectors{$sector}{warps} };
                 push @next_warps, grep { not exists($explored{$_}) }  @thing;
             }
         }
+        $distance++;
         return $port_location if defined($port_location);
         push @warps, @next_warps;
     }
@@ -142,10 +169,10 @@ sub find_distance {
     my @warps = @{ $sectors{$from}{warps} };
     my @next_warps;
     my $distance = 1;
-    while(@warps){
-        while(@warps){
+    while (@warps) {
+        while (@warps) {
             my $sector = shift @warps;
-            if($sector == $to) {
+            if ($sector == $to) {
                 return $distance;
             }
 
@@ -170,26 +197,27 @@ sub init {
     my $port_fh = IO::File->new($ports_file, "r");
 
     $sector_fh->getline; #toss throwaway line
-        $port_fh->getline; #toss throwaway line
+    $port_fh->getline; #toss throwaway line
 
-        while(my $line = $sector_fh->getline){
-            chomp $line;
-            my (undef, $sector, @warps) = split /\s+/, $line;
-            unless(defined($sector) && ($sector =~ m/[0-9]/)){
-                next;
-            }
-            my %sector;
-            $sector{warps} = \@warps;
-            $sectors{$sector} = \%sector;
+    while (my $line = $sector_fh->getline) {
+        chomp $line;
+        my (undef, $sector, @warps) = split /\s+/, $line;
+        unless (defined($sector) && ($sector =~ m/[0-9]/)) {
+            next;
         }
+        my %sector;
+        $sector{warps} = \@warps;
+        $sectors{$sector} = \%sector;
+    }
+
     $sector_fh->close;
 
-    while(my $line = $port_fh->getline){
+    while (my $line = $port_fh->getline) {
         chomp $line;
         my (@port) = split /\s+/, $line;
         my $sector = $port[1];
         map { shift @port } (1..2);
-        unless(defined($sector) && ($sector =~ m/[0-9]/)){
+        unless (defined($sector) && ($sector =~ m/[0-9]/)) {
             next;
         }
         port_fill(\@port, $sector);
@@ -206,52 +234,48 @@ sub port_fill {
     #FUEL ORE
     my $r = shift @port;
     my $f;
-    if ($r eq "-"){
+    if ($r eq "-") {
         $f = (shift @port) * -1;
     } else { 
         $f = $r;
     }
     $sectors{$sector}{port}{f} = $f;
     $r = shift @port;
-    while(! $r){
+    while (! $r) {
         $r = shift @port;
     }
     $r =~ s/\%//;
-    $sectors{$sector}{port}{fp} = $r/100;
+    $sectors{$sector}{port}{fp} = $r / 100;
 
     #ORGANICS
     $r = shift @port;
     my $o;
-    if ($r eq "-"){
+    if ($r eq "-") {
         $o = (shift @port) * -1;
     } else { 
         $o = $r;
     }
     $sectors{$sector}{port}{o} = $o;
     $r = shift @port;
-    while(! $r){
+    while (! $r) {
         $r = shift @port;
     }
     $r =~ s/\%//;
-    $sectors{$sector}{port}{op} = $r/100;
+    $sectors{$sector}{port}{op} = $r / 100;
 
     #EQUIPMENT
     $r = shift @port;
     my $e;
-    if ($r eq "-"){
+    if ($r eq "-") {
         $e = (shift @port) * -1;
     } else { 
         $e = $r;
     }
     $sectors{$sector}{port}{e} = $e;
     $r = shift @port;
-    while(! $r){
+    while (! $r) {
         $r = shift @port;
     }
     $r =~ s/\%//;
-    $sectors{$sector}{port}{ep} = $r/100;
-
-
-#print join("_|_",@{$port})."\n";
-#print Dumper($sectors{$sector}{port});
+    $sectors{$sector}{port}{ep} = $r / 100;
 }
